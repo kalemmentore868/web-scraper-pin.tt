@@ -42,18 +42,55 @@ const main = () => __awaiter(void 0, void 0, void 0, function* () {
             width: 1080,
         },
     });
-    const titles = [];
+    const products = [];
     const links = yield gatherLinks();
     const page = yield browser.newPage();
     for (const link of links) {
         yield page.goto(link);
         const title = yield page.evaluate(() => {
+            var _a;
             const titleSel = document.querySelector("#ad-title");
-            return titleSel === null || titleSel === void 0 ? void 0 : titleSel.textContent;
+            const title = (_a = titleSel === null || titleSel === void 0 ? void 0 : titleSel.textContent) === null || _a === void 0 ? void 0 : _a.replace(/\n/g, "").trim();
+            return title;
         });
-        titles.push(title);
+        const price = yield page.evaluate(() => {
+            const priceSel = document.querySelector("#show-post-render-app > div > section.list-announcement.js-analytics-category.single-item._advert > div > div.list-announcement-right > div > div.announcement-content-container.card-side > div.announcement-price > div > div > meta:nth-child(2)");
+            const price = priceSel === null || priceSel === void 0 ? void 0 : priceSel.content;
+            return price;
+        });
+        const images = yield page.evaluate(() => {
+            const imageSel = document.querySelectorAll("#show-post-render-app > div > section.list-announcement.js-analytics-category.single-item._advert > div > div.list-announcement-left > div.announcement-content-container > div.announcement__images > img");
+            const images = [];
+            for (const image of imageSel) {
+                let imageSrc = image.src;
+                images.push(imageSrc);
+            }
+            return images;
+        });
+        const phoneInfo = yield page.evaluate(() => {
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+            const infoItems = document.querySelectorAll("#show-post-render-app > div > section.list-announcement.js-analytics-category.single-item._advert > div > div.list-announcement-left > div.announcement-content-container > div.announcement-characteristics.clearfix > ul > li");
+            let color;
+            let storage;
+            let condition;
+            for (let item of infoItems) {
+                let row = item.children;
+                if (((_b = (_a = row[0]) === null || _a === void 0 ? void 0 : _a.textContent) === null || _b === void 0 ? void 0 : _b.replace(/\n/g, "").trim()) === "Color:") {
+                    color = (_d = (_c = row[1]) === null || _c === void 0 ? void 0 : _c.textContent) === null || _d === void 0 ? void 0 : _d.replace(/\n/g, "").trim();
+                }
+                else if (((_f = (_e = row[0]) === null || _e === void 0 ? void 0 : _e.textContent) === null || _f === void 0 ? void 0 : _f.replace(/\n/g, "").trim()) === "Storage:") {
+                    storage = (_h = (_g = row[1]) === null || _g === void 0 ? void 0 : _g.textContent) === null || _h === void 0 ? void 0 : _h.replace(/\n/g, "").trim();
+                }
+                else if (((_k = (_j = row[0]) === null || _j === void 0 ? void 0 : _j.textContent) === null || _k === void 0 ? void 0 : _k.replace(/\n/g, "").trim()) === "Condition:") {
+                    condition = (_m = (_l = row[1]) === null || _l === void 0 ? void 0 : _l.textContent) === null || _m === void 0 ? void 0 : _m.replace(/\n/g, "").trim();
+                }
+            }
+            return { color, storage, condition };
+        });
+        const { color, storage, condition } = phoneInfo;
+        products.push({ title, price, color, storage, condition, images, link });
     }
-    console.log("titles", titles);
+    console.log("products", products);
 });
 main();
 const gatherLinks = () => __awaiter(void 0, void 0, void 0, function* () {
