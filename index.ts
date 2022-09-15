@@ -1,6 +1,20 @@
 import * as puppeteer from "puppeteer";
+import mongoose from "mongoose";
+import Iphone from "./iphoneSchema";
 
 let browser: puppeteer.Browser;
+
+mongoose
+  .connect(
+    "mongodb+srv://kalem868:kiojah123@cluster0.ulzyh.mongodb.net/?retryWrites=true&w=majority"
+  )
+  .then(() => {
+    console.log("Mongo connection open");
+  })
+  .catch((err) => {
+    console.log("error");
+    console.log(err);
+  });
 
 const main = async () => {
   browser = await puppeteer.launch({
@@ -14,7 +28,7 @@ const main = async () => {
   const products = [];
 
   const links = await gatherLinks();
-  console.log(links);
+  console.log("got links");
   const page = await browser.newPage();
   for (const link of links) {
     await page.goto(link);
@@ -100,7 +114,14 @@ const main = async () => {
       link,
     });
   }
-  console.log("products", products);
+  console.log("got products time to insert to mongo");
+  Iphone.insertMany(products)
+    .then(function () {
+      console.log("Data inserted"); // Success
+    })
+    .catch(function (error) {
+      console.log(error); // Failure
+    });
 };
 
 main();
@@ -127,21 +148,29 @@ const gatherLinks = async () => {
     });
 
     paginatedLinks.push(...links);
-
-    //pagination
-    await page.evaluate(() => {
-      const el: HTMLAnchorElement | null = document.querySelector(
-        "a.number-list-next.js-page-filter.number-list-line"
-      );
-      el?.click();
-    });
     const pageNumber = i + 2;
 
-    await page.waitForResponse((response) => {
-      return response.url().includes(`?page=${pageNumber}`);
-    });
+    //pagination
+    try {
+      await page.evaluate(async () => {
+        const el: HTMLAnchorElement | null = document.querySelector(
+          "a.number-list-next.js-page-filter.number-list-line"
+        );
+        el?.click();
 
-    await page.waitForSelector("section.list-announcement");
+        await page.waitForResponse((response) => {
+          return response.url().includes(`?page=${pageNumber}`);
+        });
+
+        await page.waitForNavigation();
+
+        await page.waitForSelector("section.list-announcement", {
+          timeout: 0,
+        });
+      });
+    } catch (error) {
+      console.log(error);
+    }
   }
   await page.close();
   return paginatedLinks;
