@@ -31,9 +31,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const puppeteer = __importStar(require("puppeteer"));
+const mongoose_1 = __importDefault(require("mongoose"));
+const iphoneSchema_1 = __importDefault(require("./iphoneSchema"));
 let browser;
+mongoose_1.default
+    .connect("mongodb+srv://kalem868:kiojah123@cluster0.ulzyh.mongodb.net/?retryWrites=true&w=majority")
+    .then(() => {
+    console.log("Mongo connection open");
+})
+    .catch((err) => {
+    console.log("error");
+    console.log(err);
+});
 const main = () => __awaiter(void 0, void 0, void 0, function* () {
     browser = yield puppeteer.launch({
         headless: false,
@@ -44,7 +58,7 @@ const main = () => __awaiter(void 0, void 0, void 0, function* () {
     });
     const products = [];
     const links = yield gatherLinks();
-    console.log(links);
+    console.log("got links");
     const page = yield browser.newPage();
     for (const link of links) {
         yield page.goto(link);
@@ -113,7 +127,14 @@ const main = () => __awaiter(void 0, void 0, void 0, function* () {
             link,
         });
     }
-    console.log("products", products);
+    console.log("got products time to insert to mongo");
+    iphoneSchema_1.default.insertMany(products)
+        .then(function () {
+        console.log("Data inserted"); // Success
+    })
+        .catch(function (error) {
+        console.log(error); // Failure
+    });
 });
 main();
 const gatherLinks = () => __awaiter(void 0, void 0, void 0, function* () {
@@ -128,16 +149,24 @@ const gatherLinks = () => __awaiter(void 0, void 0, void 0, function* () {
             return mapped;
         });
         paginatedLinks.push(...links);
-        //pagination
-        yield page.evaluate(() => {
-            const el = document.querySelector("a.number-list-next.js-page-filter.number-list-line");
-            el === null || el === void 0 ? void 0 : el.click();
-        });
         const pageNumber = i + 2;
-        yield page.waitForResponse((response) => {
-            return response.url().includes(`?page=${pageNumber}`);
-        });
-        yield page.waitForSelector("section.list-announcement");
+        //pagination
+        try {
+            yield page.evaluate(() => __awaiter(void 0, void 0, void 0, function* () {
+                const el = document.querySelector("a.number-list-next.js-page-filter.number-list-line");
+                el === null || el === void 0 ? void 0 : el.click();
+                yield page.waitForResponse((response) => {
+                    return response.url().includes(`?page=${pageNumber}`);
+                });
+                yield page.waitForNavigation();
+                yield page.waitForSelector("section.list-announcement", {
+                    timeout: 0,
+                });
+            }));
+        }
+        catch (error) {
+            console.log(error);
+        }
     }
     yield page.close();
     return paginatedLinks;
