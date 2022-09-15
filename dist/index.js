@@ -44,6 +44,7 @@ const main = () => __awaiter(void 0, void 0, void 0, function* () {
     });
     const products = [];
     const links = yield gatherLinks();
+    console.log(links);
     const page = yield browser.newPage();
     for (const link of links) {
         yield page.goto(link);
@@ -52,6 +53,19 @@ const main = () => __awaiter(void 0, void 0, void 0, function* () {
             const titleSel = document.querySelector("#ad-title");
             const title = (_a = titleSel === null || titleSel === void 0 ? void 0 : titleSel.textContent) === null || _a === void 0 ? void 0 : _a.replace(/\n/g, "").trim();
             return title;
+        });
+        const description = yield page.evaluate(() => {
+            var _a;
+            const descSel = document.querySelector('[itemprop="description"]');
+            const descPtags = descSel === null || descSel === void 0 ? void 0 : descSel.children;
+            let description = "";
+            if (descPtags) {
+                for (let desc of descPtags) {
+                    const descText = (_a = desc.textContent) === null || _a === void 0 ? void 0 : _a.replace(/\n/g, "").trim();
+                    description += descText + ". ";
+                }
+            }
+            return description;
         });
         const price = yield page.evaluate(() => {
             const priceSel = document.querySelector("#show-post-render-app > div > section.list-announcement.js-analytics-category.single-item._advert > div > div.list-announcement-right > div > div.announcement-content-container.card-side > div.announcement-price > div > div > meta:nth-child(2)");
@@ -88,7 +102,16 @@ const main = () => __awaiter(void 0, void 0, void 0, function* () {
             return { color, storage, condition };
         });
         const { color, storage, condition } = phoneInfo;
-        products.push({ title, price, color, storage, condition, images, link });
+        products.push({
+            title,
+            price,
+            description,
+            color,
+            storage,
+            condition,
+            images,
+            link,
+        });
     }
     console.log("products", products);
 });
@@ -96,12 +119,26 @@ main();
 const gatherLinks = () => __awaiter(void 0, void 0, void 0, function* () {
     const page = yield browser.newPage();
     yield page.goto("https://pin.tt/phones-computers-electronics/mobile-phones/iphone/");
-    const links = yield page.evaluate(() => {
-        const $ = document.querySelectorAll.bind(document);
-        const sel = $("#listing > section > div.wrap > div.list-announcement-left > div.list-announcement-assortiments > ul.list-simple__output.js-list-simple__output .mask");
-        const mapped = Array.from(sel).map((item) => item.href);
-        return mapped;
-    });
+    let paginatedLinks = [];
+    for (let i = 0; i < 2; i++) {
+        const links = yield page.evaluate(() => {
+            const $ = document.querySelectorAll.bind(document);
+            const sel = $("#listing > section > div.wrap > div.list-announcement-left > div.list-announcement-assortiments > ul.list-simple__output.js-list-simple__output .mask");
+            const mapped = Array.from(sel).map((item) => item.href);
+            return mapped;
+        });
+        paginatedLinks.push(...links);
+        //pagination
+        yield page.evaluate(() => {
+            const el = document.querySelector("a.number-list-next.js-page-filter.number-list-line");
+            el === null || el === void 0 ? void 0 : el.click();
+        });
+        const pageNumber = i + 2;
+        yield page.waitForResponse((response) => {
+            return response.url().includes(`?page=${pageNumber}`);
+        });
+        yield page.waitForSelector("section.list-announcement");
+    }
     yield page.close();
-    return links;
+    return paginatedLinks;
 });

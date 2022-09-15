@@ -14,6 +14,7 @@ const main = async () => {
   const products = [];
 
   const links = await gatherLinks();
+  console.log(links);
   const page = await browser.newPage();
   for (const link of links) {
     await page.goto(link);
@@ -23,6 +24,20 @@ const main = async () => {
       const title = titleSel?.textContent?.replace(/\n/g, "").trim();
 
       return title;
+    });
+
+    const description = await page.evaluate(() => {
+      const descSel = document.querySelector('[itemprop="description"]');
+      const descPtags = descSel?.children;
+      let description = "";
+      if (descPtags) {
+        for (let desc of descPtags) {
+          const descText = desc.textContent?.replace(/\n/g, "").trim();
+          description += descText + ". ";
+        }
+      }
+
+      return description;
     });
 
     const price = await page.evaluate(() => {
@@ -74,7 +89,16 @@ const main = async () => {
     });
 
     const { color, storage, condition } = phoneInfo;
-    products.push({ title, price, color, storage, condition, images, link });
+    products.push({
+      title,
+      price,
+      description,
+      color,
+      storage,
+      condition,
+      images,
+      link,
+    });
   }
   console.log("products", products);
 };
@@ -86,17 +110,39 @@ const gatherLinks = async () => {
   await page.goto(
     "https://pin.tt/phones-computers-electronics/mobile-phones/iphone/"
   );
-  const links = await page.evaluate(() => {
-    const $ = document.querySelectorAll.bind(document);
+  let paginatedLinks = [];
+  for (let i = 0; i < 2; i++) {
+    const links = await page.evaluate(() => {
+      const $ = document.querySelectorAll.bind(document);
 
-    const sel: NodeListOf<HTMLAnchorElement> = $(
-      "#listing > section > div.wrap > div.list-announcement-left > div.list-announcement-assortiments > ul.list-simple__output.js-list-simple__output .mask"
-    );
+      const sel: NodeListOf<HTMLAnchorElement> = $(
+        "#listing > section > div.wrap > div.list-announcement-left > div.list-announcement-assortiments > ul.list-simple__output.js-list-simple__output .mask"
+      );
 
-    const mapped = Array.from(sel).map((item: HTMLAnchorElement) => item.href);
+      const mapped = Array.from(sel).map(
+        (item: HTMLAnchorElement) => item.href
+      );
 
-    return mapped;
-  });
+      return mapped;
+    });
+
+    paginatedLinks.push(...links);
+
+    //pagination
+    await page.evaluate(() => {
+      const el: HTMLAnchorElement | null = document.querySelector(
+        "a.number-list-next.js-page-filter.number-list-line"
+      );
+      el?.click();
+    });
+    const pageNumber = i + 2;
+
+    await page.waitForResponse((response) => {
+      return response.url().includes(`?page=${pageNumber}`);
+    });
+
+    await page.waitForSelector("section.list-announcement");
+  }
   await page.close();
-  return links;
+  return paginatedLinks;
 };
